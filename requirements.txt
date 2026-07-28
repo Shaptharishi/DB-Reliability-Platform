@@ -1,0 +1,7 @@
+
+psycopg2-binary
+mysql-connector-python
+redis
+clickhouse-connect
+requests
+python-dotenv
