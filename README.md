@@ -64,7 +64,7 @@ Every service runs in its own container, orchestrated with Docker Compose, with 
 ## Running It
 
 ```bash
-git clone <this-repo>
+git clone https://github.com/Shaptharishi/DB-Reliability-Platform
 cd db-reliability-platform
 cp .env.example .env   # add your own Slack webhook URL
 docker compose up --build
