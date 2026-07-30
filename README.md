@@ -21,29 +21,35 @@ Each result passes through a rule engine that encodes real operational threshold
 1. Writes the alert permanently to ClickHouse (for historical analysis)
 2. Sends a formatted Slack notification with severity, message, and a linked runbook
 3. Every raw metric — whether or not it triggered an alert — is also stored in ClickHouse, building a continuous historical trend rather than only point-in-time snapshots
+4. Grafana reads metrics directly from ClickHouse to provide live dashboards showing connection usage, memory usage, replication health, and historical trends across all monitored databases.
 
 ## Architecture
 
 ```
-┌─────────────┐   ┌─────────┐   ┌───────┐
-│ PostgreSQL  │   │  MySQL  │   │ Redis │
-└──────┬──────┘   └────┬────┘   └───┬───┘
-       │               │            │
-       └───────┬────────┴────────────┘
+ ┌─────────────┐   ┌─────────┐   ┌───────┐
+ │ PostgreSQL  │   │  MySQL  │   │ Redis │
+ └──────┬──────┘   └────┬────┘   └───┬───┘
+        │               │            │
+        └───────┬───────┴────────────┘
                 │
         ┌───────▼────────┐
-        │  Python         │
-        │  Collector +    │  ← polls every 30s, applies rules
-        │  Rule Engine    │
+        │  Python        │
+        │  Collector +   │  ← polls every 30s, applies rules
+        │  Rule Engine   │
         └───────┬────────┘
                 │
-        ┌───────▼────────┐
-        │   ClickHouse    │  ← metrics history + alert log
-        └───────┬────────┘
+        ┌───────────────┐
+        │  ClickHouse   │
+        │ Metrics/Alerts│
+        └───────┬───────┘
                 │
-        ┌───────▼────────┐
-        │  Slack Webhook  │  ← real-time notification
-        └────────────────┘
+      ┌─────────┴─────────┐
+      │                   │
+┌─────▼─────┐      ┌──────▼──────┐
+│ Grafana   │      │ Slack       │
+│ Dashboards│      │Notifications│
+└───────────┘      └─────────────┘
+        
 ```
 
 Every service runs in its own container, orchestrated with Docker Compose, with health checks gating startup order and application-level retry logic handling runtime reconnection if a dependency becomes temporarily unavailable after startup.
@@ -85,7 +91,6 @@ ORDER BY ts DESC;
 
 ## What I'd Add Next
 
-- A Grafana dashboard reading directly from ClickHouse, for visual trend analysis alongside the Slack alerts
 - MongoDB and ClickHouse itself as additional monitored targets, extending the same collector/rule pattern
 - Terraform to provision the underlying infrastructure (currently assumes Docker is already available)
 - Kubernetes manifests as an alternative deployment target for horizontal scaling of the collector

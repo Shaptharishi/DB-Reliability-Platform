@@ -59,6 +59,18 @@ services:
       timeout: 5s
       retries: 5
 
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
   collector:
     build: .
     depends_on:
@@ -97,4 +109,5 @@ volumes:
   postgres_data:
   mysql_data:
   clickhouse_data:
-
+  grafana_data: 
+  
