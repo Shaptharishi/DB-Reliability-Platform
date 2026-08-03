@@ -1,49 +1,6 @@
-
+version: "3.9"
 
 services:
-  postgres:
-    image: postgres:14
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: pass
-      POSTGRES_DB: testdb1
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-
-  mysql:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: pass
-      MYSQL_DATABASE: testdb1
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -ppass"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-  
-
-  redis:
-    image: redis:7
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     ports:
@@ -53,6 +10,7 @@ services:
       CLICKHOUSE_PASSWORD: ppass
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse-config/memory-limit.xml:/etc/clickhouse-server/config.d/memory-limit.xml
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
       interval: 5s
@@ -74,12 +32,6 @@ services:
   collector:
     build: .
     depends_on:
-      postgres:
-        condition: service_healthy
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
       clickhouse:
         condition: service_healthy
     environment:
@@ -92,7 +44,7 @@ services:
       MYSQL_HOST: ${MYSQL_HOST}
       MYSQL_PORT: 3306
       MYSQL_DB: testdb1
-      MYSQL_USER: root
+      MYSQL_USER: admin
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
 
       REDIS_HOST: ${REDIS_HOST}
@@ -106,8 +58,5 @@ services:
       SLACK_WEBHOOK_URL: ${slack_webhook_url}
 
 volumes:
-  postgres_data:
-  mysql_data:
   clickhouse_data:
-  grafana_data: 
-  
+  grafana_data:
