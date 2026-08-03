@@ -1,2 +1,10 @@
 .env
 venv/
+
+terraform-dbrp/terraform.tfvars
+
+terraform-dbrp/.terraform/
+
+terraform-dbrp/*.tfstate
+
+terraform-dbrp/*.tfstate.backup
