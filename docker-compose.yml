@@ -83,19 +83,19 @@ services:
       clickhouse:
         condition: service_healthy
     environment:
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: ${POSTGRES_HOST}
       POSTGRES_PORT: 5432
       POSTGRES_DB: testdb1
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: pass
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
-      MYSQL_HOST: mysql
+      MYSQL_HOST: ${MYSQL_HOST}
       MYSQL_PORT: 3306
       MYSQL_DB: testdb1
       MYSQL_USER: root
-      MYSQL_PASSWORD: pass
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
 
-      REDIS_HOST: redis
+      REDIS_HOST: ${REDIS_HOST}
       REDIS_PORT: 6379
 
       CLICKHOUSE_HOST: clickhouse
