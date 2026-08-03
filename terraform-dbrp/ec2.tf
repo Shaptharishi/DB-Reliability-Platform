@@ -23,7 +23,7 @@ resource "aws_instance" "collector" {
     mysql_host         = aws_db_instance.mysql.address
     mysql_password     = var.mysql_password
     redis_host         = aws_elasticache_replication_group.redis.primary_endpoint_address
-    slack_webhook_url  = var.slack_webhook_url
+    slack_webhook_url  = var.SLACK_WEBHOOK_URL
   })
 
   tags = {

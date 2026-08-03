@@ -10,7 +10,7 @@ variable "mysql_password" {
   sensitive   = true
 }
 
-variable "slack_webhook_url" {
+variable "SLACK_WEBHOOK_URL" {
   description = "Slack incoming webhook URL for alerts"
   type        = string
   sensitive   = true

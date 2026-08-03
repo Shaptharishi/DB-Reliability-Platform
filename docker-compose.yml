@@ -55,7 +55,7 @@ services:
       CLICKHOUSE_USER: default
       CLICKHOUSE_PASSWORD: ppass
 
-      SLACK_WEBHOOK_URL: ${slack_webhook_url}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL}
 
 volumes:
   clickhouse_data:
