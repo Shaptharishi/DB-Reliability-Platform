@@ -15,6 +15,11 @@ resource "aws_instance" "collector" {
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
   subnet_id              = data.aws_subnets.default.ids[1]
 
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+  }
+
   user_data_replace_on_change = true
 
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
