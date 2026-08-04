@@ -19,11 +19,11 @@ resource "aws_security_group" "ec2_sg" {
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
-    description = "SSH from my IP"
+    description = "SSH - key auth only, open for GitHub Actions CI/CD"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${chomp(data.http.my_ip.response_body)}/32"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   ingress {
