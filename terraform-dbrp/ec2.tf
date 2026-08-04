@@ -10,10 +10,10 @@ data "aws_ami" "ubuntu" {
 
 resource "aws_instance" "collector" {
   ami                    = data.aws_ami.ubuntu.id
-  instance_type          = "t3.micro"
+  instance_type          = "t3.small"
   key_name               = "db-reliability-ec2-key"
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
-  subnet_id              = data.aws_subnets.default.ids[0]
+  subnet_id              = data.aws_subnets.default.ids[1]
 
   user_data_replace_on_change = true
 

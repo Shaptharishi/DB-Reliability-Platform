@@ -6,7 +6,11 @@ def get_connection(host, port, db=0):
             host=host,
             port=port,
             db=db,
-            decode_responses=True)
+            decode_responses=True,
+            ssl=True,
+            ssl_cert_reqs=None,
+            socket_timeout=10,
+            socket_connect_timeout=10)
 
 def check_memory_usage(conn):
     info = conn.info()
@@ -22,10 +26,19 @@ def check_memory_usage(conn):
     return {'used_memory_bytes':used_memory, 'maxmemory_bytes':maxmemory, 'percent_used':round(percent_used,2) if percent_used is not None else None}
 
 def check_eviction_policy(conn):
-    config = conn.config_get('maxmemory-policy')
-    policy = config.get('maxmemory-policy')
+    try:
+        config = conn.config_get("maxmemory-policy")
+        policy = config.get("maxmemory-policy")
+    except Exception as e:
+        return {
+            "eviction_policy": "unavailable",
+            "is_noeviction": None
+        }
 
-    return {'eviction_policy': policy, 'is_noeviction': policy =='noeviction'}
+    return {
+        "eviction_policy": policy,
+        "is_noeviction": policy == "noeviction"
+    }
 
 def check_clients_and_replication(conn):
     info = conn.info()
