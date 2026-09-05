@@ -10,3 +10,5 @@ terraform-dbrp/*.tfstate
 terraform-dbrp/*.tfstate.backup
 
 k8s/collector-secret.yaml
+
+terraform-dbrp/terraform.tfstate.*.backup
