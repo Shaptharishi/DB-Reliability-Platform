@@ -5,3 +5,4 @@ redis
 clickhouse-connect
 requests
 python-dotenv
+prometheus-client

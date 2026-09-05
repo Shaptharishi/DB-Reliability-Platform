@@ -15,10 +15,12 @@ spec:
       containers:
         - name: collector
           image: db-reliability-platform-collector:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
+          command: ["python3"]
+          args: ["collectors/postgres_collector.py"]
           env:
             - name: POSTGRES_HOST
-              value: "db-reliability-postgres-tf.cfooacks8hqs.eu-north-1.rds.amazonaws.com"
+              value: "postgres"
             - name: POSTGRES_PORT
               value: "5432"
             - name: POSTGRES_DB

@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-collector-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-collector-test
+  template:
+    metadata:
+      labels:
+        app: postgres-collector-test
+    spec:
+      containers:
+        - name: collector
+          image: db-test-platform-collector:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python3","-u"]
+          args: ["collectors/postgres_collector.py"]
+          env:
+            - name: POSTGRES_HOST
+              value: "postgres"
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              value: "testdb1"
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              value: "pass"

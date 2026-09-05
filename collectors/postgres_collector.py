@@ -1,5 +1,21 @@
+from prometheus_client import Gauge, start_http_server 
+import time 
+import psycopg2  
 
-import psycopg2
+postgres_connections = Gauge(
+    "postgres_connections",
+    "Current number of PostgreSQL connections"
+)
+
+postgres_max_connections = Gauge(
+    "postgres_max_connections",
+    "Maximum allowed PostgreSQL connections"
+)
+
+postgres_connection_usage_percent = Gauge(
+    "postgres_connection_usage_percent",
+    "Percentage of PostgreSQL connections currently in use"
+)
 
 def get_connection(host, port, dbname, user, password):
     return psycopg2.connect(
@@ -26,6 +42,11 @@ def check_connection_usage(conn):
         percent_used = (current/max_conn) * 100
 
     cur.close()
+
+    # Export values to Prometheus
+    postgres_connections.set(current)
+    postgres_max_connections.set(max_conn)
+    postgres_connection_usage_percent.set(percent_used)
 
     result_dict = {'current':current, 'max_conn':max_conn, 'percent_used':percent_used}
 
@@ -93,8 +114,13 @@ def check_table_bloat(conn):
     return {'tables':tables}
 
 if __name__ == '__main__':
-    conn = get_connection('localhost', 5432, 'testdb1', 'postgres', 'pass')
-    print(check_connection_usage(conn))
-    print(check_replication_lag(conn))
-    print(check_idle_transactions(conn))
-    print(check_table_bloat(conn))
+    start_http_server(8000)
+    while True:
+    
+        conn = get_connection('postgres', 5432, 'testdb1', 'postgres', 'pass')
+        print(check_connection_usage(conn))
+        print(check_replication_lag(conn))
+        print(check_idle_transactions(conn))
+        print(check_table_bloat(conn))
+        conn.close()
+        time.sleep(30)
