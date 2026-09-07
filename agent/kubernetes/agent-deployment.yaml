@@ -50,6 +50,6 @@ spec:
               value: "8123"
           resources:
             limits:
-              memory: "600Mi"
+              memory: "700Mi"
             requests:
               memory: "400Mi"
