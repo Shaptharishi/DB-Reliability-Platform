@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-agent
+  template:
+    metadata:
+      labels:
+        app: db-agent
+    spec:
+      containers:
+        - name: db-agent
+          image: db-agent:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secrets
+                  key: GROQ_API_KEY
+            - name: PG_HOST
+              value: "agent-postgres"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DB
+              value: "agentdb"
+            - name: PG_USER
+              value: "postgres"
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secrets
+                  key: PG_PASSWORD
+            - name: PG_READONLY_USER
+              value: "agent_readonly"
+            - name: PG_READONLY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secrets
+                  key: PG_READONLY_PASSWORD
+            - name: CH_HOST
+              value: "agent-clickhouse"
+            - name: CH_PORT
+              value: "8123"
+          resources:
+            limits:
+              memory: "600Mi"
+            requests:
+              memory: "400Mi"
