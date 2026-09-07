@@ -1,0 +1,8 @@
+groq
+python-dotenv
+psycopg2-binary
+sentence-transformers
+clickhouse-connect
+fastapi
+uvicorn
+mcp<2
