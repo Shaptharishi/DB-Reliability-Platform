@@ -1,100 +1,74 @@
-# DB Reliability & Incident Response Platform
+# DB Reliability & Incident Response Platform — Kubernetes (k3s) Deployment
 
-A lightweight monitoring and diagnostic system for PostgreSQL, MySQL, and Redis. Instead of just alerting that "something is wrong," it encodes real operational judgment — the same diagnostic steps a support/SRE engineer runs manually — and turns them into automated, continuously-running checks with human-readable root-cause diagnoses and linked runbooks.
+This branch (`version-k3s`) is a parallel deployment of the same monitoring platform found on the `versions` branch, running on **Kubernetes (k3s)** instead of Docker Compose. It uses the identical underlying application code and the same AWS-provisioned RDS/ElastiCache databases — only the container orchestration layer differs.
 
-## The Problem
+## Why This Branch Exists
 
-Most database incidents follow repeatable patterns: connection exhaustion, replication lag, table bloat, slow queries, stuck idle-in-transaction sessions. Diagnosing these usually means an engineer manually running the same handful of diagnostic queries every single time an incident occurs. This project automates that diagnostic process itself — not just detection, but the actual reasoning a human would apply.
+The `versions` branch proves the platform works with Docker Compose. This branch demonstrates the same platform running under real container orchestration — automatic restarts, declarative desired-state management, and Kubernetes-native networking — to show genuine, hands-on Kubernetes competency rather than Docker Compose alone.
 
 ## What It Does
 
-Every 30 seconds, the collector connects to PostgreSQL, MySQL, and Redis and runs a set of real diagnostic checks against each:
-
-**PostgreSQL** — connection usage, replication lag (via `pg_stat_replication`, using WAL byte-diff rather than wall-clock time to avoid false positives on idle primaries), idle-in-transaction sessions, table bloat (dead tuple ratio).
-
-**MySQL** — connection usage, replication thread status (IO thread vs SQL thread checked separately, since they fail for different reasons), recurring slow query patterns via `performance_schema`, active InnoDB transactions.
-
-**Redis** — memory usage against `maxmemory`, eviction policy configuration, connected clients and replication role.
-
-Each result passes through a rule engine that encodes real operational thresholds and judgment (e.g. distinguishing "no memory limit configured" from "0% memory used" — two very different, easily-confused states). When a rule fires, the system:
-
-1. Writes the alert permanently to ClickHouse (for historical analysis)
-2. Sends a formatted Slack notification with severity, message, and a linked runbook
-3. Every raw metric — whether or not it triggered an alert — is also stored in ClickHouse, building a continuous historical trend rather than only point-in-time snapshots
-4. Grafana reads metrics directly from ClickHouse to provide live dashboards showing connection usage, memory usage, replication health, and historical trends across all monitored databases.
+A Python collector checks PostgreSQL, MySQL, and Redis every 30 seconds, running automated diagnostic checks (connection usage, replication lag, idle transactions, table bloat, slow queries) through a rule engine that produces a specific root-cause diagnosis rather than a generic alert. Metrics and alerts are stored in ClickHouse, visualized in Grafana, and pushed to Slack in real time.
 
 ## Architecture
 
 ```
- ┌─────────────┐   ┌─────────┐   ┌───────┐
- │ PostgreSQL  │   │  MySQL  │   │ Redis │
- └──────┬──────┘   └────┬────┘   └───┬───┘
-        │               │            │
-        └───────┬───────┴────────────┘
-                │
-        ┌───────▼────────┐
-        │  Python        │
-        │  Collector +   │  ← polls every 30s, applies rules
-        │  Rule Engine   │
-        └───────┬────────┘
-                │
-        ┌───────────────┐
-        │  ClickHouse   │
-        │ Metrics/Alerts│
-        └───────┬───────┘
-                │
-      ┌─────────┴─────────┐
-      │                   │
-┌─────▼─────┐      ┌──────▼──────┐
-│ Grafana   │      │ Slack       │
-│ Dashboards│      │Notifications│
-└───────────┘      └─────────────┘
-        
+                    ┌─────────────────────┐
+                    │   AWS RDS/ElastiCache │
+                    │  PostgreSQL / MySQL /  │
+                    │       Redis             │
+                    └──────────┬──────────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │   Collector Pod       │  (Python, runs every 30s)
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │   ClickHouse Pod      │  (metrics + alerts store)
+                    └──────────┬──────────┘
+                               │
+                    ┌──────────▼──────────┐
+                    │   Grafana Pod          │  (dashboards, NodePort 30000)
+                    └────────────────────────┘
 ```
 
-Every service runs in its own container, orchestrated with Docker Compose, with health checks gating startup order and application-level retry logic handling runtime reconnection if a dependency becomes temporarily unavailable after startup.
+All three components run as Kubernetes Deployments with Services, on a single-node k3s cluster provisioned via Terraform on an AWS EC2 instance.
 
-## Why These Specific Technology Choices
+## Infrastructure
 
-- **ClickHouse for metrics storage**: this is a genuinely OLAP access pattern — high-volume, timestamped, numeric data, queried mostly via aggregates over time ranges. A row-based OLTP database would work but isn't the right tool for this specific shape of data.
-- **Slack webhook for alerting**: the standard, real-world integration point every company in this space actually uses for exactly this kind of ops notification.
-- **Docker healthchecks *and* application-level retry logic**: these solve two different problems. Healthchecks ensure clean startup ordering. Retry logic handles a dependency becoming unavailable later, mid-operation, after the system has already been running — healthchecks alone don't cover that case.
-- **Runbooks as version-controlled markdown**: every alert links to a specific, structured runbook (symptoms → likely causes → diagnosis steps → resolution → prevention), mirroring how real support/SRE teams document operational knowledge.
+- **Terraform** provisions the EC2 instance, RDS PostgreSQL, RDS MySQL, ElastiCache (Valkey), and all VPC security groups — identical to the `versions` branch's infrastructure code.
+- **A self-bootstrapping `user_data.sh.tpl` script**, executed automatically on the EC2 instance's first boot, installs Docker (used only to build the collector image), installs k3s, builds and imports the collector image into k3s's containerd store, generates a Kubernetes Secret containing real database credentials, and applies all five Kubernetes manifests.
+- **Kubernetes manifests** (in `k8s/`): `clickhouse-deployment.yaml`, `clickhouse-service.yaml`, `grafana-deployment.yaml`, `grafana-service.yaml`, `collector-deployment.yaml`, and `collector-secret.example.yaml` (a placeholder committed to Git; the real, populated `collector-secret.yaml` is generated at boot and gitignored).
 
-## Running It
+## Real Production Issues Diagnosed on This Branch
+
+- **DiskPressure eviction** — k3s's own control-plane overhead, combined with an 8GB root disk, caused repeated Pod evictions. Diagnosed via `kubectl describe pod`, confirmed by the Events section explicitly naming `DiskPressure`. Fixed by increasing the EBS volume to 20GB.
+- **`kubectl` permission denied** — the `ubuntu` user lacked correct ownership of `~/.kube/config` after k3s installation. Fixed by explicitly setting `KUBECONFIG` and correcting file ownership.
+- **A genuine startup race condition** — the collector Pod occasionally starts before ClickHouse is ready to accept connections, exhausting its retry logic and crashing. Kubernetes' Deployment controller automatically restarts it, and it connects successfully on the next attempt — a real, live demonstration of self-healing, though a readiness probe or init container would be the more correct long-term fix (not yet implemented on this branch).
+- **Git divergent branches on the EC2 instance** — caused by root-owned repository files after running commands as root during initial setup. Fixed with `git config --global --add safe.directory` and correcting ownership.
+
+## Running This Branch
 
 ```bash
-git clone https://github.com/Shaptharishi/DB-Reliability-Platform
-cd db-reliability-platform
-cp .env.example .env   # add your own Slack webhook URL
-docker compose up --build
+git checkout version-k3s
+cd terraform-dbrp
+terraform init
+terraform apply
 ```
 
-That's the entire setup. Docker Compose builds the collector, pulls official images for PostgreSQL/MySQL/Redis/ClickHouse, and starts everything together on a shared network. The collector automatically creates its own ClickHouse schema on first run — no manual database setup required.
+Terraform will provision the infrastructure and the EC2 instance's boot script will automatically install k3s and deploy the application. Full bootstrap takes approximately 8–10 minutes.
 
-## Querying the History
+Once complete, connect via SSH and verify:
 
-```sql
--- Connection usage trend for PostgreSQL over the last 24 hours
-SELECT ts, metric_value
-FROM monitoring.metrics
-WHERE db_type = 'postgresql' AND metric_name = 'percent_used'
-ORDER BY ts DESC
-LIMIT 100;
-
--- All critical alerts in the last week
-SELECT ts, rule, message
-FROM monitoring.alerts
-WHERE severity = 'critical'
-ORDER BY ts DESC;
+```bash
+kubectl get pods
+kubectl get nodes
 ```
 
-## What I'd Add Next
+Grafana is reachable at `http://<ec2-public-ip>:30000` (NodePort, not the default port 3000).
 
-- MongoDB and ClickHouse itself as additional monitored targets, extending the same collector/rule pattern
-- Terraform to provision the underlying infrastructure (currently assumes Docker is already available)
-- Kubernetes manifests as an alternative deployment target for horizontal scaling of the collector
+## Known Limitations
 
-## My Role
-
-Solo project — architecture, all collector/rule/storage logic, Docker Compose orchestration, and deployment design.
+- Storage is backed by `emptyDir`, not a `PersistentVolumeClaim` — data does not survive a Pod restart. This was a deliberate simplification for a personal project; a production deployment would use persistent storage.
+- Terraform state is local and shared with the `versions` branch. Applying either branch replaces whatever is currently deployed — only one version is genuinely live at a time. Proper isolation would require Terraform workspaces or separate state backends.
+- No Ingress controller; Grafana is exposed directly via NodePort for simplicity.
