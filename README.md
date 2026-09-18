@@ -2,6 +2,8 @@
 
 A lightweight monitoring and diagnostic system for PostgreSQL, MySQL, and Redis. Instead of just alerting that "something is wrong," it encodes real operational judgment — the same diagnostic steps a support/SRE engineer runs manually — and turns them into automated, continuously-running checks with human-readable root-cause diagnoses and linked runbooks.
 
+This branch (`main`) contains the original, local Docker Compose deployment. See [Other Branches](#other-branches) below for the AWS/Terraform infrastructure, the Kubernetes deployment, and a separate LLM-powered agent built on top of this same platform.
+
 ## The Problem
 
 Most database incidents follow repeatable patterns: connection exhaustion, replication lag, table bloat, slow queries, stuck idle-in-transaction sessions. Diagnosing these usually means an engineer manually running the same handful of diagnostic queries every single time an incident occurs. This project automates that diagnostic process itself — not just detection, but the actual reasoning a human would apply.
@@ -49,7 +51,6 @@ Each result passes through a rule engine that encodes real operational threshold
 │ Grafana   │      │ Slack       │
 │ Dashboards│      │Notifications│
 └───────────┘      └─────────────┘
-        
 ```
 
 Every service runs in its own container, orchestrated with Docker Compose, with health checks gating startup order and application-level retry logic handling runtime reconnection if a dependency becomes temporarily unavailable after startup.
@@ -89,12 +90,24 @@ WHERE severity = 'critical'
 ORDER BY ts DESC;
 ```
 
+## Other Branches
+
+This repository also contains several other deployment approaches for this same platform, plus a separate AI agent extension:
+
+- **[`versions`](../../tree/versions)** — the same platform deployed to real AWS infrastructure (RDS, ElastiCache, EC2), provisioned entirely as code with Terraform, with automated build-and-deploy via GitHub Actions CI/CD.
+- **[`version-k3s`](../../tree/version-k3s)** — the same AWS infrastructure as `versions`, deployed to Kubernetes (k3s) instead of Docker Compose, demonstrating container orchestration and self-healing.
+- **[`version-ai_integration`](../../tree/version-ai_integration)** — exploratory work extending the monitoring stack with Prometheus and an incident simulator.
+- **[`ai-agent`](../../tree/ai-agent)** — a genuine LLM-powered troubleshooting agent built on top of this platform: real tool-calling, retrieval-augmented generation over the platform's own runbooks, a Model Context Protocol server/client, an automated evaluation harness, and full request-level observability. Deployed on Kubernetes with GitOps delivery via ArgoCD, and independently redeployed to Microsoft Azure to prove genuine cloud portability.
+
+Each branch has its own `README.md` with full architecture details and a real, honest record of the production issues hit and fixed while building it.
+
 ## What I'd Add Next
 
-- MongoDB and ClickHouse itself as additional monitored targets, extending the same collector/rule pattern
-- Terraform to provision the underlying infrastructure (currently assumes Docker is already available)
-- Kubernetes manifests as an alternative deployment target for horizontal scaling of the collector
+- MongoDB as an additional monitored target, extending the same collector/rule pattern
+- Explicit SLIs/SLOs and error budget calculations against the real historical metrics already stored in ClickHouse
+- Persistent volume storage on the Kubernetes deployment, replacing the current `emptyDir` approach
+- Integrating the `ai-agent` branch's troubleshooting capability directly into this platform's alerting flow, rather than as a separate application
 
 ## My Role
 
-Solo project — architecture, all collector/rule/storage logic, Docker Compose orchestration, and deployment design.
+Solo project — architecture, all collector/rule/storage logic, infrastructure-as-code, container orchestration across Docker Compose and Kubernetes, and the AI agent extension, across both AWS and Azure.
